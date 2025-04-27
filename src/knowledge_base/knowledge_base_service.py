@@ -1,4 +1,4 @@
-from datetime import datetime
+# from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import Optional
 import os
@@ -7,23 +7,25 @@ import time
 import json   
 from src.database import models
 from src.knowledge_base.knowledge_base_dto import Profession, KnowledgeArea, Skill
+from src.analytics.analyser import analyse_vacancy
 from sqlalchemy import func
 from src.database.db import db_dependency
 from fastapi import HTTPException
 
 
 def update_profession_data(Profession, db):
-    it_roles_hh = get_roles('11')
-    id_profession = find_role(it_roles_hh, Profession.name_profession)
-    save_profession_to_db(db, id_profession, Profession.name_profession)
-    token = get_access_token(os.environ.get('HH_CLIENT_ID'), os.environ.get('HH_CLIENT_SECRET'))
+    # it_roles_hh = get_roles('11')
+    # id_profession = find_role(it_roles_hh, Profession.name_profession)
+    # save_profession_to_db(db, id_profession, Profession.name_profession)
+    # token = os.environ.get('HH_TOKEN')
 
-    vacancies_ids = get_vacancies_ids(id_profession, token, 2)
+    # vacancies_ids = get_vacancies_ids(id_profession, token, 20)
 
-    for vacancy_id in vacancies_ids:
-        skills = get_vacancy_skills(vacancy_id, token)
-        save_vacancies_to_db(db, vacancy_id, skills, id_profession)
-
+    # for vacancy_id in vacancies_ids:
+    #     skills = get_vacancy_skills(vacancy_id, token)
+    #     if skills != 'Нет навыков':
+    #         save_vacancies_to_db(db, vacancy_id, skills, id_profession)
+    analyse_vacancy(db, '10') #id_profession
 
 
 
@@ -49,7 +51,7 @@ def get_access_token(client_id, client_secret):
         "client_id": client_id,
         "client_secret": client_secret
     }
-    headers = {"User-Agent": "MyApp/1.0 (my-app@example.com)"}
+    headers = {"User-Agent": "myapp://auth (alisa.fomo@yandex.ru)"}
     
     try:
         response = requests.post(auth_url, data=data, headers=headers)
@@ -62,7 +64,7 @@ def get_access_token(client_id, client_secret):
 def get_vacancy_skills(vacancy_id, access_token=None):
     """Получает ключевые навыки для конкретной вакансии."""
     url = f"https://api.hh.ru/vacancies/{vacancy_id}"
-    headers = {"User-Agent": "MyApp/1.0 (my-app@example.com)"}
+    headers = {"User-Agent": "myapp://auth (alisa.fomo@yandex.ru)"}
     
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
@@ -88,12 +90,12 @@ def get_vacancies_ids(role_id, access_token=None, num_pages=1, per_page=100):
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
     
-    for page in range(num_pages):
+    for page in range( num_pages):
         params = {
             "professional_role": role_id,
-            "area": 113,          # 113 — Россия
-            "page": page,          # Номер страницы (начинается с 0)
-            "per_page": per_page,  # Макс. 100
+            "area": 113,          
+            "page": page,          
+            "per_page": per_page,  
         }
         
         try:
@@ -101,7 +103,6 @@ def get_vacancies_ids(role_id, access_token=None, num_pages=1, per_page=100):
             response.raise_for_status()
             data = response.json()
             
-            # Добавляем ID каждой вакансии в массив
             for vacancy in data.get("items", []):
                 vacancies_ids.append(vacancy["id"])
             
