@@ -12,6 +12,7 @@ class Skill(Base):
     __tablename__ = 'skill'
 
     id_skill = Column(Integer, primary_key=True, autoincrement=True)
+    id_profession = Column(Integer)
     name_skill = Column(String)
 
 class KnowledgeArea(Base):
@@ -19,6 +20,7 @@ class KnowledgeArea(Base):
 
     id_knowledge_area = Column(Integer, primary_key=True, autoincrement=True)
     name_knowledge_area = Column(String)
+    id_profession = Column(Integer)
     
 class Vacancy(Base):
     __tablename__ = 'vacancy'
@@ -26,12 +28,6 @@ class Vacancy(Base):
     id_vacancy = Column(Integer, primary_key=True)
     key_skills = Column(String)
     id_profession = Column(Integer)
-
-class SkillByProfession(Base):
-    __tablename__ = 'skill_by_profession'
-
-    id_skill = Column(Integer, primary_key=True)
-    id_profession = Column(Integer, primary_key=True)
 
 class SkillByKnowledgeArea(Base):
     __tablename__ = 'skill_by_knowledge_area'

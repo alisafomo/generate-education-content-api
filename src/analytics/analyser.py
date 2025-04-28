@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
 from src.database import models
 import pandas as pd
+from openai import OpenAI
+import json
+import os
 from sklearn.cluster import DBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import silhouette_score
@@ -21,10 +24,71 @@ nltk.download('wordnet')
 
 def analyse_vacancy(db, id_profession):
     df = get_skills_by_profession(db, id_profession)
-    
-    if df.empty:
-        print("Данные не найдены")
+    topics_data = get_skill_topics(df)
+    knowledge_areas = get_knowledge_areas_by_topics(topics_data)
+    save_knowledge_areas_to_db(db, knowledge_areas, id_profession)
 
+def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
+    try:
+        saved_count_skills = 0
+        saved_count_areas = 0
+        saved_count_relations = 0
+        
+        # Сначала сохраняем все навыки
+        for area in knowledge_areas:
+            for skill_name in area["topic_words"]:
+                new_skill = models.Skill(
+                    id_profession=id_profession,
+                    name_skill=skill_name
+                )
+                db.add(new_skill)
+                db.flush()  # Чтобы получить ID нового навыка
+                saved_count_skills += 1
+
+        # Затем сохраняем области знаний
+        knowledge_area_ids = {}
+        for area in knowledge_areas:
+            new_knowledge_area = models.KnowledgeArea(
+                id_profession=id_profession,
+                name_knowledge_area=area["name"]
+            )
+            db.add(new_knowledge_area)
+            db.flush()  # Чтобы получить ID новой области
+            knowledge_area_ids[area["name"]] = new_knowledge_area.id_knowledge_area
+            saved_count_areas += 1
+        
+        # Теперь сохраняем связи между навыками и областями знаний
+        for area in knowledge_areas:
+            knowledge_area_id = knowledge_area_ids[area["name"]]
+            for skill_name in area["topic_words"]:
+                # Находим ID навыка
+                skill = db.query(models.Skill).filter_by(
+                    id_profession=id_profession,
+                    name_skill=skill_name
+                ).first()
+                
+                if skill:
+                    # Создаем связь
+                    new_relation = models.SkillByKnowledgeArea(
+                        id_skill=skill.id_skill,
+                        id_knowledge_area=knowledge_area_id
+                    )
+                    db.add(new_relation)
+                    saved_count_relations += 1
+        
+        db.commit()
+        print(f"Успешно сохранено {saved_count_skills} навыков")
+        print(f"Успешно сохранено {saved_count_areas} областей")
+        print(f"Успешно сохранено {saved_count_relations} связей между навыками и областями")
+        return "Успешно"
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Ошибка при сохранении: {str(e)}")
+        return str(e)
+        
+
+def get_skill_topics(df):
     all_phrases = []
     for skills_str in df['key_skills']:
         phrases = [phrase.strip() for phrase in skills_str.split(',')]
@@ -72,11 +136,41 @@ def analyse_vacancy(db, id_profession):
     eta = best_params['eta']
 
     lda_model = LdaModel(corpus, num_topics=num_topics, alpha = alpha, eta = eta, id2word=dictionary, passes=10)
-
+    
+    topics_data = []
     for idx, topic in lda_model.print_topics(-1):
         # Разделяем строку на слова и веса
         topic_words = [word.split('*')[1].strip('"') for word in topic.split(' + ')]
         print(f"Topic {idx}: {', '.join(topic_words)}")
+        topics_data.append({
+            "id": idx,
+            "topic_words": topic_words
+        })
+    return topics_data
+
+def get_knowledge_areas_by_topics(topics_data):
+    client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com")
+
+    # Формируем JSON-промпт (пустая строка + данные)
+    prompt = "Дай каждому топику название по структуре id name (название, которое ты дал) topic_words (массив слов) в json:"  
+    messages = [
+        {"role": "system", "content": "Ты — помощник, который даёт темам названия на русском."},
+        {"role": "user", "content": prompt + ' ' + json.dumps(topics_data, ensure_ascii=False)}
+    ]
+
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+        result = json.loads(response.choices[0].message.content)
+        return result
+    
+    except Exception as e:
+        raise Exception(f"API request failed: {e}")
+
 
 def find_optimal_lda_params(df_skills, clasters_dbscan):
     words = list(df_skills.skill[clasters_dbscan.klaster > 0].apply(word_tokenize))
