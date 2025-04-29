@@ -38,7 +38,7 @@ def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
         for area in knowledge_areas:
             for skill_name in area["topic_words"]:
                 new_skill = models.Skill(
-                    id_profession=id_profession,
+                    id_profession=int(id_profession),
                     name_skill=skill_name
                 )
                 db.add(new_skill)
@@ -49,7 +49,7 @@ def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
         knowledge_area_ids = {}
         for area in knowledge_areas:
             new_knowledge_area = models.KnowledgeArea(
-                id_profession=id_profession,
+                id_profession=int(id_profession),
                 name_knowledge_area=area["name"]
             )
             db.add(new_knowledge_area)
@@ -63,15 +63,15 @@ def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
             for skill_name in area["topic_words"]:
                 # Находим ID навыка
                 skill = db.query(models.Skill).filter_by(
-                    id_profession=id_profession,
+                    id_profession=int(id_profession),
                     name_skill=skill_name
                 ).first()
                 
                 if skill:
                     # Создаем связь
                     new_relation = models.SkillByKnowledgeArea(
-                        id_skill=skill.id_skill,
-                        id_knowledge_area=knowledge_area_id
+                        id_skill=int(skill.id_skill),
+                        id_knowledge_area=int(knowledge_area_id)
                     )
                     db.add(new_relation)
                     saved_count_relations += 1
@@ -101,11 +101,11 @@ def get_skill_topics(df):
     df_unique_skills = pd.DataFrame({'skill': unique_processed_phrases})
     vectorizer = TfidfVectorizer(max_features=500)
     X = vectorizer.fit_transform(unique_processed_phrases)
-    # tfidf500 = pd.DataFrame(X.toarray(), columns=vectorizer.get_feature_names_out())
+    tfidf500 = pd.DataFrame(X.toarray(), columns=vectorizer.get_feature_names_out())
     best_params, best_score = find_optimal_dbscan_params(unique_processed_phrases, X)
 
-    # print(f"Лучшие параметры: eps={best_params['eps']}, min_samples={best_params['min_samples']}")
-    # print(f"Лучший silhouette score: {best_score}")
+    print(f"Лучшие параметры: eps={best_params['eps']}, min_samples={best_params['min_samples']}")
+    print(f"Лучший silhouette score: {best_score}")
     dbscan = DBSCAN(eps=best_params['eps'], min_samples=best_params['min_samples'])
     labels = dbscan.fit_predict(X)
     clasters_dbscan = dbscan.labels_
@@ -121,14 +121,14 @@ def get_skill_topics(df):
         new_row = {'skill': " ".join([word for word, _ in most_common_words])}
         df_skills = pd.concat([df_skills, pd.DataFrame([new_row])], ignore_index=True)
 
-        # print(f"Кластер {i+1}:")
-        # print(" ".join([word for word, _ in most_common_words]))  # Вывод слов
-
-    # Создание словаря и корпуса
-    dictionary = Dictionary(words)
-    corpus = [dictionary.doc2bow(doc) for doc in words]
+        print(f"Кластер {i+1}:")
+        print(" ".join([word for word, _ in most_common_words]))  # Вывод слов
 
     best_params, best_coherence = find_optimal_lda_params(df_skills, clasters_dbscan)
+
+    words = list(df_skills.skill[clasters_dbscan.klaster > 0].apply(word_tokenize))
+    dictionary = Dictionary(words)
+    corpus = [dictionary.doc2bow(doc) for doc in words]
 
     # Обучение LDA модели
     num_topics = best_params['num_topics']
@@ -152,7 +152,7 @@ def get_knowledge_areas_by_topics(topics_data):
     client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com")
 
     # Формируем JSON-промпт (пустая строка + данные)
-    prompt = "Дай каждому топику название по структуре id name (название, которое ты дал) topic_words (массив слов) в json:"  
+    prompt = "Дай каждому топику название по структуре id name (название, которое ты дал) topic_words (массив слов) результат выведи только в json (без дополнительного текста):"  
     messages = [
         {"role": "system", "content": "Ты — помощник, который даёт темам названия на русском."},
         {"role": "user", "content": prompt + ' ' + json.dumps(topics_data, ensure_ascii=False)}
