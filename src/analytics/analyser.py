@@ -23,10 +23,48 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 
 def analyse_vacancy(db, id_profession):
-    df = get_skills_by_profession(db, id_profession)
-    topics_data = get_skill_topics(df)
-    knowledge_areas = get_knowledge_areas_by_topics(topics_data)
-    save_knowledge_areas_to_db(db, knowledge_areas, id_profession)
+    # df = get_skills_by_profession(db, id_profession)
+    # topics_data = get_skill_topics(df)
+    # knowledge_areas = get_knowledge_areas_by_topics(topics_data)
+    # save_knowledge_areas_to_db(db, knowledge_areas, id_profession)
+    education_modules = create_education_modules(db, '124')
+
+def create_education_modules(db, id_profession):
+    # client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com")
+    knowledge_areas = db.query(models.KnowledgeArea.name_knowledge_area, models.KnowledgeArea.id_knowledge_area)\
+                        .filter(models.KnowledgeArea.id_profession == id_profession)\
+                        .all()
+
+    print(knowledge_areas)
+
+    for area in knowledge_areas:
+        print(area)
+        skills_by_areas = db.query(models.Skill.name_skill)\
+            .join(models.SkillByKnowledgeArea, models.Skill.id_skill == models.SkillByKnowledgeArea.id_skill)\
+            .filter(models.SkillByKnowledgeArea.id_knowledge_area == area[1])\
+            .all()
+        list_skills = ', '.join([skill[0] for skill in skills_by_areas])
+        print(list_skills)
+        prompt = f"Title: {area[0]}, listTargetSkills: {list_skills}"
+        messages = [
+            {"role": "system", "content": "Ты придумываешь структуру курса по названию и навыкам, и отвечаешь строго в формате json по формату. Строго придерживайся формата, не добавляй новых полей и не удаляй существующие. Формат:  areaOfKnowledge: { id, title, listTargetSkills, modules: [{id, title, listCoveredSkills}]}"},
+            {"role": "user", "content": prompt}
+        ]
+
+        try:
+            # response = client.chat.completions.create(
+            #     model="deepseek-chat",
+            #     messages=messages,
+            #     response_format={"type": "json_object"},
+            #     temperature=0.3
+            # )
+            # result = json.loads(response.choices[0].message.content)
+            result = []
+            print(result)
+            return result
+        
+        except Exception as e:
+            raise Exception(f"API request failed: {e}")
 
 def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
     try:
@@ -34,58 +72,67 @@ def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
         saved_count_areas = 0
         saved_count_relations = 0
         
-        # Сначала сохраняем все навыки
-        for area in knowledge_areas:
-            for skill_name in area["topic_words"]:
+        # Проверяем структуру входных данных
+        if not isinstance(knowledge_areas, dict) or "topics" not in knowledge_areas:
+            raise ValueError("Некорректный формат данных. Ожидается словарь с ключом 'topics'")
+        
+        topics = knowledge_areas["topics"]
+        if not isinstance(topics, list):
+            raise ValueError("'topics' должен быть списком тем")
+        
+        # Сохраняем области знаний и собираем их ID
+        knowledge_area_ids = {}
+        for topic in topics:
+            if not isinstance(topic, dict):
+                raise ValueError("Каждая тема должна быть словарём")
+            
+            # Проверяем обязательные поля
+            required_fields = ["id","name", "topic_words"]
+            if not all(field in topic for field in required_fields):
+                raise ValueError(f"Тема должна содержать поля: {required_fields}")
+            
+            # Сохраняем область знаний
+            new_knowledge_area = models.KnowledgeArea(
+                id_profession=id_profession,
+                name_knowledge_area=topic["name"]
+            )
+            db.add(new_knowledge_area)
+            db.flush()  # Получаем ID новой области
+            knowledge_area_ids[topic["id"]] = new_knowledge_area.id_knowledge_area
+            saved_count_areas += 1
+
+        # Сохраняем навыки и их связи с областями
+        for topic in topics:
+            knowledge_area_id = knowledge_area_ids[topic["id"]]
+            
+            for skill_name in topic["topic_words"]:
+                # Сохраняем навык
                 new_skill = models.Skill(
-                    id_profession=int(id_profession),
+                    id_profession=id_profession,
                     name_skill=skill_name
                 )
                 db.add(new_skill)
-                db.flush()  # Чтобы получить ID нового навыка
+                db.flush()  # Получаем ID нового навыка
                 saved_count_skills += 1
-
-        # Затем сохраняем области знаний
-        knowledge_area_ids = {}
-        for area in knowledge_areas:
-            new_knowledge_area = models.KnowledgeArea(
-                id_profession=int(id_profession),
-                name_knowledge_area=area["name"]
-            )
-            db.add(new_knowledge_area)
-            db.flush()  # Чтобы получить ID новой области
-            knowledge_area_ids[area["name"]] = new_knowledge_area.id_knowledge_area
-            saved_count_areas += 1
-        
-        # Теперь сохраняем связи между навыками и областями знаний
-        for area in knowledge_areas:
-            knowledge_area_id = knowledge_area_ids[area["name"]]
-            for skill_name in area["topic_words"]:
-                # Находим ID навыка
-                skill = db.query(models.Skill).filter_by(
-                    id_profession=int(id_profession),
-                    name_skill=skill_name
-                ).first()
                 
-                if skill:
-                    # Создаем связь
-                    new_relation = models.SkillByKnowledgeArea(
-                        id_skill=int(skill.id_skill),
-                        id_knowledge_area=int(knowledge_area_id)
-                    )
-                    db.add(new_relation)
-                    saved_count_relations += 1
+                # Создаём связь между навыком и областью
+                new_relation = models.SkillByKnowledgeArea(
+                    id_skill=new_skill.id_skill,
+                    id_knowledge_area=knowledge_area_id
+                )
+                db.add(new_relation)
+                saved_count_relations += 1
         
         db.commit()
-        print(f"Успешно сохранено {saved_count_skills} навыков")
-        print(f"Успешно сохранено {saved_count_areas} областей")
-        print(f"Успешно сохранено {saved_count_relations} связей между навыками и областями")
+        print(f"Успешно сохранено: {saved_count_areas} областей знаний")
+        print(f"Успешно сохранено: {saved_count_skills} навыков")
+        print(f"Успешно сохранено: {saved_count_relations} связей")
         return "Успешно"
         
     except Exception as e:
         db.rollback()
         print(f"Ошибка при сохранении: {str(e)}")
-        return str(e)
+        return f"Ошибка: {str(e)}"
         
 
 def get_skill_topics(df):
@@ -116,7 +163,7 @@ def get_skill_topics(df):
 
     for i in range(k):
         words = df_unique_skills.skill[clasters_dbscan.klaster == i]  # Тексты кластера
-        most_common_words = Counter(words).most_common(k)
+        most_common_words = Counter(words).most_common(3)
 
         new_row = {'skill': " ".join([word for word, _ in most_common_words])}
         df_skills = pd.concat([df_skills, pd.DataFrame([new_row])], ignore_index=True)
@@ -151,8 +198,7 @@ def get_skill_topics(df):
 def get_knowledge_areas_by_topics(topics_data):
     client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com")
 
-    # Формируем JSON-промпт (пустая строка + данные)
-    prompt = "Дай каждому топику название по структуре id name (название, которое ты дал) topic_words (массив слов) результат выведи только в json (без дополнительного текста):"  
+    prompt = "Дай каждому топику название по структуре id, name (название, которое ты дал) topic_words (составь из слов осмысленные навыки, при необходимости дополни или исключи лишние слова, и запиши массив навыков) результат выведи только в json {'topics': [{id : 0, name:'', topic_words:['']}]} (без дополнительного текста):"  
     messages = [
         {"role": "system", "content": "Ты — помощник, который даёт темам названия на русском."},
         {"role": "user", "content": prompt + ' ' + json.dumps(topics_data, ensure_ascii=False)}
@@ -166,6 +212,7 @@ def get_knowledge_areas_by_topics(topics_data):
             temperature=0.3
         )
         result = json.loads(response.choices[0].message.content)
+        print(result)
         return result
     
     except Exception as e:

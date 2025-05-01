@@ -5,6 +5,8 @@ from sqlalchemy import func
 from src.database.db import db_dependency
 from fastapi import HTTPException
 
+def get_educational_module(knowledge_area, db):
+    pass
 
 def get_lecture_material(skill, db):
     pass

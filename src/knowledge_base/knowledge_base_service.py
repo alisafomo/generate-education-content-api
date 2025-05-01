@@ -1,5 +1,6 @@
 # from datetime import datetime
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from typing import Optional
 import os
 import requests   
@@ -25,7 +26,8 @@ def update_profession_data(Profession, db):
     #     skills = get_vacancy_skills(vacancy_id, token)
     #     if skills != 'Нет навыков':
     #         save_vacancies_to_db(db, vacancy_id, skills, id_profession)
-    analyse_vacancy(db, '10') #id_profession
+    
+    analyse_vacancy(db, '124') #id_profession
 
 
 
@@ -89,13 +91,20 @@ def get_vacancies_ids(role_id, access_token=None, num_pages=1, per_page=100):
     headers = {"User-Agent": "myapp://auth (alisa.fomo@yandex.ru)"}
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
-    
-    for page in range( num_pages):
+
+    # date_to = []
+    # date_from = []
+    # date_to.append(datetime.now().date())
+    # date_to.append(datetime.now().date()- timedelta(days=182))
+    # date_from.append(datetime.now().date() - timedelta(days=181))
+    # date_from.append(datetime.now().date() - timedelta(days=365))
+
+    for page in range(num_pages):
         params = {
             "professional_role": role_id,
             "area": 113,          
             "page": page,          
-            "per_page": per_page,  
+            "per_page": per_page
         }
         
         try:
@@ -129,6 +138,7 @@ def get_roles(category: str):
                             jsObj['categories'][i]['roles'][j]['name']])
     filtered_data_roles = [record for record in data if record[0] == category]
     dict_roles = {row[2]: row[3] for row in filtered_data_roles}
+    print(dict_roles)
     return dict_roles
 
 

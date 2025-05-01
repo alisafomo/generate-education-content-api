@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 class Profession(BaseModel):
-    name_profession: str = 'Аналитик'
+    name_profession: str = 'Тестировщик'
 
 class KnowledgeArea(BaseModel):
     name_knowledge_area: str = 'Бизнес-процессы'
