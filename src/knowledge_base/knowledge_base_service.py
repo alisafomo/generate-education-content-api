@@ -15,19 +15,19 @@ from fastapi import HTTPException
 
 
 def update_profession_data(Profession, db):
-    # it_roles_hh = get_roles('11')
-    # id_profession = find_role(it_roles_hh, Profession.name_profession)
-    # save_profession_to_db(db, id_profession, Profession.name_profession)
-    # token = os.environ.get('HH_TOKEN')
+    it_roles_hh = get_roles('11')
+    id_profession = find_role(it_roles_hh, Profession.name_profession)
+    save_profession_to_db(db, id_profession, Profession.name_profession)
+    token = os.environ.get('HH_TOKEN')
 
-    # vacancies_ids = get_vacancies_ids(id_profession, token, 20)
+    vacancies_ids = get_vacancies_ids(id_profession, token, 20)
 
-    # for vacancy_id in vacancies_ids:
-    #     skills = get_vacancy_skills(vacancy_id, token)
-    #     if skills != 'Нет навыков':
-    #         save_vacancies_to_db(db, vacancy_id, skills, id_profession)
+    for vacancy_id in vacancies_ids:
+        skills = get_vacancy_skills(vacancy_id, token)
+        if skills != 'Нет навыков':
+            save_vacancies_to_db(db, vacancy_id, skills, id_profession)
     
-    analyse_vacancy(db, '124') #id_profession
+    analyse_vacancy(db, id_profession)
 
 
 

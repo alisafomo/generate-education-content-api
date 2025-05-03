@@ -23,25 +23,22 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 
 def analyse_vacancy(db, id_profession):
-    # df = get_skills_by_profession(db, id_profession)
-    # topics_data = get_skill_topics(df)
-    # knowledge_areas = get_knowledge_areas_by_topics(topics_data)
-    # save_knowledge_areas_to_db(db, knowledge_areas, id_profession)
-    education_modules = create_education_modules(db, '124')
+    df = get_skills_by_profession(db, id_profession)
+    topics_data = get_skill_topics(df)
+    knowledge_areas = get_knowledge_areas_by_topics(topics_data)
+    save_knowledge_areas_to_db(db, knowledge_areas, id_profession)
+    create_education_modules(db, id_profession)
 
 def create_education_modules(db, id_profession):
-    # client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com")
+    client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com")
     knowledge_areas = db.query(models.KnowledgeArea.name_knowledge_area, models.KnowledgeArea.id_knowledge_area)\
                         .filter(models.KnowledgeArea.id_profession == id_profession)\
                         .all()
 
-    print(knowledge_areas)
-
     for area in knowledge_areas:
         print(area)
         skills_by_areas = db.query(models.Skill.name_skill)\
-            .join(models.SkillByKnowledgeArea, models.Skill.id_skill == models.SkillByKnowledgeArea.id_skill)\
-            .filter(models.SkillByKnowledgeArea.id_knowledge_area == area[1])\
+            .filter(models.Skill.id_knowledge_area == area[1])\
             .all()
         list_skills = ', '.join([skill[0] for skill in skills_by_areas])
         print(list_skills)
@@ -52,25 +49,56 @@ def create_education_modules(db, id_profession):
         ]
 
         try:
-            # response = client.chat.completions.create(
-            #     model="deepseek-chat",
-            #     messages=messages,
-            #     response_format={"type": "json_object"},
-            #     temperature=0.3
-            # )
-            # result = json.loads(response.choices[0].message.content)
-            result = []
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=messages,
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+            result = json.loads(response.choices[0].message.content)
             print(result)
-            return result
+            try:
+                # Получаем данные из JSON
+                knowledge_area = result['areaOfKnowledge']
+                modules = knowledge_area['modules']
+                
+                for module in modules:
+                    # Создаем образовательный модуль
+                    new_module = models.EducationalModule(
+                        name_educational_module=module['title'],
+                        id_knowledge_area=area[1],
+                        requirements=""  # или можно добавить из JSON, если есть
+                    )
+                    db.add(new_module)
+                    db.flush()  # Чтобы получить ID нового модуля
+                    
+                    # Обрабатываем навыки для этого модуля
+                    for skill_name in module['listCoveredSkills']:
+                        # Ищем навык в базе данных по названию
+                        skill = db.query(models.Skill.id_skill).filter(models.Skill.name_skill == skill_name, models.Skill.id_profession == id_profession, models.Skill.id_knowledge_area == area[1]).first()
+                        if skill:
+                            # Связываем навык с модулем
+                            module_skill = models.SkillByEducationalModule(
+                                id_educational_module=new_module.id_educational_module,
+                                id_skill=skill[0]
+                            )
+                            db.add(module_skill)
+                    
+                db.commit()
+                print("Данные успешно сохранены")
+            except Exception as e:
+                db.rollback()
+                print(f"Ошибка при сохранении данных: {e}")
         
         except Exception as e:
             raise Exception(f"API request failed: {e}")
+    return True 
+
 
 def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
     try:
         saved_count_skills = 0
         saved_count_areas = 0
-        saved_count_relations = 0
         
         # Проверяем структуру входных данных
         if not isinstance(knowledge_areas, dict) or "topics" not in knowledge_areas:
@@ -109,24 +137,16 @@ def save_knowledge_areas_to_db(db, knowledge_areas, id_profession):
                 # Сохраняем навык
                 new_skill = models.Skill(
                     id_profession=id_profession,
-                    name_skill=skill_name
+                    name_skill=skill_name,
+                    id_knowledge_area=knowledge_area_id
                 )
                 db.add(new_skill)
                 db.flush()  # Получаем ID нового навыка
                 saved_count_skills += 1
-                
-                # Создаём связь между навыком и областью
-                new_relation = models.SkillByKnowledgeArea(
-                    id_skill=new_skill.id_skill,
-                    id_knowledge_area=knowledge_area_id
-                )
-                db.add(new_relation)
-                saved_count_relations += 1
         
         db.commit()
         print(f"Успешно сохранено: {saved_count_areas} областей знаний")
         print(f"Успешно сохранено: {saved_count_skills} навыков")
-        print(f"Успешно сохранено: {saved_count_relations} связей")
         return "Успешно"
         
     except Exception as e:
@@ -281,9 +301,7 @@ def preprocess_phrase(phrase: str) -> str:
     lemmatizer = WordNetLemmatizer()
     
     tokens = list(filter(str.isalpha, word_tokenize(phrase.lower())))
-    
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
-    
     tokens = [word for word in tokens if word not in stop_words]
     
     return ' '.join(tokens)
