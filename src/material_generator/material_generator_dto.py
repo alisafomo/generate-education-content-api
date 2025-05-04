@@ -15,10 +15,11 @@ class ReferenceMaterial(BaseModel):
 
 class TestMaterial(BaseModel):
     skills: str = 'mongodb, compass'
-    title: str = 'Введение в MongoDB'
-    link: str = 'Ссылка на материал'
+    type: str = 'Введение в MongoDB'
+    text: str = 'Какие из этих принципов относятся к REST?'
+    options: list[dict] = [{'Stateless', True}]
 
 class TaskMaterial(BaseModel):
     skills: str = 'mongodb, compass'
-    title: str = 'Введение в MongoDB'
-    link: str = 'Ссылка на материал'
+    text: str = 'Какие из этих принципов относятся к REST?'
+    answer: str = 'Ссылка на материал'

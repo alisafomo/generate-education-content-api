@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from src.auth import get_api_key
 from src.knowledge_base import knowledge_base_service
 from src.knowledge_base.knowledge_base_dto import Profession, KnowledgeArea, Skill
@@ -28,12 +28,12 @@ async def get_list_professions(db: db_dependency, api_key: str = Depends(get_api
 
 
 @router.get('/list_knowledge_areas', summary='Получение списка областей знаний по профессии', 
-            description='Получаем JSON с списком областей знаний, которые необходимо освоить для работы по профессии.')
-async def get_list_knowledge_areas(profession: Profession, db: db_dependency, api_key: str = Depends(get_api_key)) -> list[KnowledgeArea]:
-    return knowledge_base_service.get_list_knowledge_areas(profession, db)
+            description='Получаем список образовательных модулей.')
+async def get_list_knowledge_areas(db: db_dependency, Profession: str = Query(...), api_key: str = Depends(get_api_key)) -> list[KnowledgeArea]:
+    return knowledge_base_service.get_list_knowledge_areas(db, {"profession": Profession})
 
 
 @router.get('/list_skills', summary='Получение списка навыков для области знаний', 
             description='Получаем JSON с списком навыков для области знаний.')
-async def get_list_skills(knowledge_area: KnowledgeArea, db: db_dependency, api_key: str = Depends(get_api_key)) -> list[Skill]:
-    return knowledge_base_service.get_list_skills(knowledge_area, db)
+async def get_list_skills(db: db_dependency, KnowledgeArea: str = Query(...), api_key: str = Depends(get_api_key)) -> list[Skill]:
+    return knowledge_base_service.get_list_skills(db, {"knowledge_area": KnowledgeArea})

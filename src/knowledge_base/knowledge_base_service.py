@@ -15,36 +15,147 @@ from fastapi import HTTPException
 
 
 def update_profession_data(Profession, db):
-    it_roles_hh = get_roles('11')
-    id_profession = find_role(it_roles_hh, Profession.name_profession)
-    save_profession_to_db(db, id_profession, Profession.name_profession)
-    token = os.environ.get('HH_TOKEN')
+    # it_roles_hh = get_roles('11')
+    # id_profession = find_role(it_roles_hh, Profession.name_profession)
+    # save_profession_to_db(db, id_profession, Profession.name_profession)
+    # token = os.environ.get('HH_TOKEN')
 
-    vacancies_ids = get_vacancies_ids(id_profession, token, 20)
+    # vacancies_ids = get_vacancies_ids(id_profession, token, 20)
 
-    for vacancy_id in vacancies_ids:
-        skills = get_vacancy_skills(vacancy_id, token)
-        if skills != 'Нет навыков':
-            save_vacancies_to_db(db, vacancy_id, skills, id_profession)
+    # for vacancy_id in vacancies_ids:
+    #     skills = get_vacancy_skills(vacancy_id, token)
+    #     if skills != 'Нет навыков':
+    #         save_vacancies_to_db(db, vacancy_id, skills, id_profession)
     
-    analyse_vacancy(db, id_profession)
+    analyse_vacancy(db, '124')
 
 
 
-def delete_profession_data(profession, db):
-    pass
+
+def delete_profession_data(profession_name, db):
+    try:
+        # Получаем объект профессии
+        profession = db.query(models.Profession).filter_by(name_profession=profession_name.name_profession).first()
+        
+        if not profession:
+            print(f"Профессия '{profession_name.name_profession}' не найдена.")
+            return
+        
+        id_profession = profession.id_profession
+        
+        # Удаляем связанные записи в правильном порядке (сначала зависимые таблицы)
+        
+        # 1. Удаляем связи SkillByEducationalModule
+        skill_ids = [skill.id_skill for skill in db.query(models.Skill.id_skill)
+                    .filter_by(id_profession=id_profession).all()]
+        
+        if skill_ids:
+            # Удаляем связи образовательных модулей с навыками
+            db.query(models.SkillByEducationalModule)\
+              .filter(models.SkillByEducationalModule.id_skill.in_(skill_ids))\
+              .delete(synchronize_session=False)
+            
+            # Удаляем образовательные модули, связанные через эти навыки
+            module_ids = [row[0] for row in 
+                         db.query(models.SkillByEducationalModule.id_educational_module)
+                         .filter(models.SkillByEducationalModule.id_skill.in_(skill_ids))
+                         .distinct().all()]
+            
+            if module_ids:
+                db.query(models.EducationalModule)\
+                  .filter(models.EducationalModule.id_educational_module.in_(module_ids))\
+                  .delete(synchronize_session=False)
+        
+        # 2. Удаляем образовательные модули, связанные через области знаний
+        knowledge_area_ids = [ka.id_knowledge_area for ka in 
+                            db.query(models.KnowledgeArea)
+                            .filter_by(id_profession=id_profession).all()]
+        
+        if knowledge_area_ids:
+            # Удаляем связи образовательных модулей
+            db.query(models.SkillByEducationalModule)\
+              .filter(models.SkillByEducationalModule.id_educational_module.in_(
+                  db.query(models.EducationalModule.id_educational_module)
+                  .filter(models.EducationalModule.id_knowledge_area.in_(knowledge_area_ids))
+              )).delete(synchronize_session=False)
+            
+            # Удаляем сами модули
+            db.query(models.EducationalModule)\
+              .filter(models.EducationalModule.id_knowledge_area.in_(knowledge_area_ids))\
+              .delete(synchronize_session=False)
+        
+        # 3. Удаляем вакансии
+        db.query(models.Vacancy)\
+          .filter_by(id_profession=id_profession)\
+          .delete(synchronize_session=False)
+        
+        # 4. Удаляем навыки
+        db.query(models.Skill)\
+          .filter_by(id_profession=id_profession)\
+          .delete(synchronize_session=False)
+        
+        # 5. Удаляем области знаний
+        db.query(models.KnowledgeArea)\
+          .filter_by(id_profession=id_profession)\
+          .delete(synchronize_session=False)
+        
+        # 6. Удаляем саму профессию
+        db.delete(profession)
+        db.commit()
+        
+        print(f"Все данные для профессии '{profession_name.name_profession}' успешно удалены.")
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Ошибка при удалении данных: {str(e)}")
+        raise
 
 
 def get_list_professions(db):
-    pass
+    professions = db.query(models.Profession.name_profession).all()
+    print(professions) 
+
+    result: list[Profession] = []
+    for profession in professions:
+        profession_obj = Profession(
+            name_profession=profession[0] 
+        )
+        result.append(profession_obj)
+    
+    return result
 
 
-def get_list_knowledge_areas(profession, db):
-    pass
+def get_list_knowledge_areas(db, profession):
+    knowledge_areas = db.query(models.KnowledgeArea.name_knowledge_area).\
+        join(models.Profession, models.KnowledgeArea.id_profession == models.Profession.id_profession).\
+        filter(models.Profession.name_profession == profession['profession']).\
+        all()
+    print(knowledge_areas)
+
+    result: list[KnowledgeArea] = []
+    for area in knowledge_areas:
+        knowledge_area = KnowledgeArea(
+            name_knowledge_area=area[0]
+        )
+        result.append(knowledge_area)
+    return result
 
 
-def get_list_skills(knowledge_area, db):
-    pass
+def get_list_skills(db, knowledge_area):
+    skills = db.query(models.Skill.name_skill).\
+        join(models.KnowledgeArea, models.Skill.id_knowledge_area == models.KnowledgeArea.id_knowledge_area).\
+        filter(models.KnowledgeArea.name_knowledge_area == knowledge_area['knowledge_area']).\
+        all()
+    print(skills)  
+
+    result: list[Skill] = []
+    for skill in skills:
+        skill_obj = Skill(
+            name_skill=skill[0] 
+        )
+        result.append(skill_obj)
+    
+    return result
 
 def get_access_token(client_id, client_secret):
     auth_url = "https://hh.ru/oauth/token"

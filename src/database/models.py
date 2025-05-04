@@ -35,7 +35,6 @@ class EducationalModule(Base):
 
     id_educational_module = Column(Integer, primary_key=True, autoincrement=True)
     name_educational_module = Column(String)
-    requirements = Column(String)
     id_knowledge_area = Column(Integer)
 
 class SkillByEducationalModule(Base):

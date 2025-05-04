@@ -23,10 +23,10 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 
 def analyse_vacancy(db, id_profession):
-    df = get_skills_by_profession(db, id_profession)
-    topics_data = get_skill_topics(df)
-    knowledge_areas = get_knowledge_areas_by_topics(topics_data)
-    save_knowledge_areas_to_db(db, knowledge_areas, id_profession)
+    # df = get_skills_by_profession(db, id_profession)
+    # topics_data = get_skill_topics(df)
+    # knowledge_areas = get_knowledge_areas_by_topics(topics_data)
+    # save_knowledge_areas_to_db(db, knowledge_areas, id_profession)
     create_education_modules(db, id_profession)
 
 def create_education_modules(db, id_profession):
@@ -53,7 +53,7 @@ def create_education_modules(db, id_profession):
                 model="deepseek-chat",
                 messages=messages,
                 response_format={"type": "json_object"},
-                temperature=0.3
+                temperature=1.2
             )
             result = json.loads(response.choices[0].message.content)
             print(result)
@@ -66,8 +66,7 @@ def create_education_modules(db, id_profession):
                     # Создаем образовательный модуль
                     new_module = models.EducationalModule(
                         name_educational_module=module['title'],
-                        id_knowledge_area=area[1],
-                        requirements=""  # или можно добавить из JSON, если есть
+                        id_knowledge_area=area[1]
                     )
                     db.add(new_module)
                     db.flush()  # Чтобы получить ID нового модуля
@@ -229,7 +228,7 @@ def get_knowledge_areas_by_topics(topics_data):
             model="deepseek-chat",
             messages=messages,
             response_format={"type": "json_object"},
-            temperature=0.3
+            temperature=1.0
         )
         result = json.loads(response.choices[0].message.content)
         print(result)
