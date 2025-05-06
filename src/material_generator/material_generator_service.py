@@ -34,7 +34,7 @@ def get_lecture_material(db, user_prompt):
     client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com")
     prompt = f"Тема модуля: {user_prompt['educational_module']}. Навыки, которые должен получить обучающийся: {list_skills}. Дополнительная информация: {user_prompt['additional_info']}"
     messages = [
-        {"role": "system", "content": "Ты пишешь планы лекций для модуля электронного курса. Выводишь только json со структурой {lectures: [{title, skills: [], plan}]. Дополнительнцю информацию в вопросе считай приоритетной, если она есть. "},
+        {"role": "system", "content": "Ты пишешь планы лекций для модуля электронного курса на русском языке. Выводишь только json со структурой {lectures: [{title, skills: [], plan}]. Дополнительнцю информацию в вопросе считай приоритетной, если она есть. "},
         {"role": "user", "content": prompt}
     ]
     response = client.chat.completions.create(
@@ -98,7 +98,7 @@ def get_test(db, user_prompt):
     client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com/")
     prompt = f"Тема модуля: {user_prompt['educational_module']}. Навыки, которые должен получить обучающийся: {list_skills}. Дополнительная информация: {user_prompt['additional_info']}"
     messages = [
-        {"role": "system", "content": "Ты пишешь тестовые задания по теме и навыкам. Выводишь только json со структурой {questions : [{skills: [], type, text, options: [{text, isCorrect}]}]}. type может быть single_choice, multiple_choice и true_false (по умолчанию single_choice), text - текст вопроса, options - варианты ответа (по умолчанию 4 штуки). Количество заданий 1 штука. Дополнительнцю информацию в вопросе считай приоритетной, если она есть. "},
+        {"role": "system", "content": "Ты пишешь тестовые задания по теме и навыкам на русском языке. Выводишь только json со структурой {questions : [{skills: [], type, text, options: [{text, isCorrect}]}]}. type может быть single_choice, multiple_choice и true_false (по умолчанию single_choice), text - текст вопроса, options - варианты ответа (по умолчанию 4 штуки). Количество заданий 1 штука. Дополнительнцю информацию в вопросе считай приоритетной, если она есть. "},
         {"role": "user", "content": prompt}
     ]
     response = client.chat.completions.create(
@@ -132,7 +132,7 @@ def get_task(db, user_prompt):
     client = OpenAI(api_key=os.environ.get('DEEPSEEK_TOKEN'), base_url="https://api.deepseek.com/")
     prompt = f"Тема модуля: {user_prompt['educational_module']}. Навыки, которые должен получить обучающийся: {list_skills}. Дополнительная информация: {user_prompt['additional_info']}"
     messages = [
-        {"role": "system", "content": "Ты пишешь задания с развёрнутым ответм (ответ от одного слова до трёх предложений). Выводишь только json со структурой {tasks: [{text, skills: [], answer}]. text - текст вопроса, answer - ответ на вопрос. Количество заданий 1 штука. Дополнительнцю информацию в вопросе считай приоритетной, если она есть. "},
+        {"role": "system", "content": "Ты пишешь задания с развёрнутым ответом (ответ от одного слова до трёх предложений) на русском языке. Выводишь только json со структурой {tasks: [{text, skills: [], answer}]. text - текст вопроса, answer - ответ на вопрос. Количество заданий 1 штука. Дополнительнцю информацию в вопросе считай приоритетной, если она есть. "},
         {"role": "user", "content": prompt}
     ]
     response = client.chat.completions.create(
