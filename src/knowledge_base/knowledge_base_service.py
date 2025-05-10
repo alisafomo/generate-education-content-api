@@ -1,6 +1,4 @@
-# from datetime import datetime
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
 from typing import Optional
 import os
 import requests   
@@ -8,26 +6,22 @@ import time
 import json   
 from src.database import models
 from src.knowledge_base.knowledge_base_dto import Profession, KnowledgeArea, Skill
-from src.analytics.analyser import analyse_vacancy
-from sqlalchemy import func
-from src.database.db import db_dependency
-from fastapi import HTTPException
+from src.analyser.analyser import analyse_vacancy
 
 
 def update_profession_data(Profession, db):
-    # it_roles_hh = get_roles('11')
-    # id_profession = find_role(it_roles_hh, Profession.name_profession)
-    # save_profession_to_db(db, id_profession, Profession.name_profession)
-    # token = os.environ.get('HH_TOKEN')
+    it_roles_hh = get_roles('11')
+    id_profession = find_role(it_roles_hh, Profession.name_profession)
+    save_profession_to_db(db, id_profession, Profession.name_profession)
+    token = os.environ.get('HH_TOKEN')
 
-    # vacancies_ids = get_vacancies_ids(id_profession, token, 20)
+    vacancies_ids = get_vacancies_ids(id_profession, token, 20)
 
-    # for vacancy_id in vacancies_ids:
-    #     skills = get_vacancy_skills(vacancy_id, token)
-    #     if skills != 'Нет навыков':
-    #         save_vacancies_to_db(db, vacancy_id, skills, id_profession)
-    
-    analyse_vacancy(db, '124')
+    for vacancy_id in vacancies_ids:
+        skills = get_vacancy_skills(vacancy_id, token)
+        if skills != 'Нет навыков':
+            save_vacancies_to_db(db, vacancy_id, skills, id_profession)
+    analyse_vacancy(db, id_profession)
 
 
 

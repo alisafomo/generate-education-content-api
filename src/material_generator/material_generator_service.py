@@ -1,9 +1,5 @@
-from datetime import datetime
 from src.database import models
 from src.material_generator.material_generator_dto import EducationalModule, LectureMaterial, ReferenceMaterial, TestMaterial, TaskMaterial
-from sqlalchemy import func
-from src.database.db import db_dependency
-from fastapi import HTTPException
 from openai import OpenAI
 import json
 import os
