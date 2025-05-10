@@ -16,8 +16,8 @@ router = APIRouter(
 async def get_educational_modules(db: db_dependency, KnowledgeArea: str = Query(...), api_key: str = Depends(get_api_key)) -> list[EducationalModule]:
     return material_generator_service.get_educational_modules(db, {"knowledge_area": KnowledgeArea})
 
-@router.get('/lecture_material', summary='Получение лекционного материала', 
-            description='Получаем JSON лекционным материалом.')
+@router.get('/lecture_material', summary='Получение плана лекционного материала', 
+            description='Получаем JSON с планом лекционного материала.')
 async def get_lecture_material(db: db_dependency, EducationalModule: str = Query(...), AdditionalInfo: str = Query(''), api_key: str = Depends(get_api_key)) -> list[LectureMaterial]:
     return material_generator_service.get_lecture_material(db, {"educational_module": EducationalModule, "additional_info": AdditionalInfo})
 
