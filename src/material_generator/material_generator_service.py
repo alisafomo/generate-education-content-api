@@ -3,6 +3,9 @@ from src.material_generator.material_generator_dto import EducationalModule, Lec
 from openai import OpenAI
 import json
 import os
+import requests
+from lxml import etree
+import time
 
 def get_educational_modules(db, area):
     educational_modules = db.query(models.EducationalModule.name_educational_module).\
@@ -75,10 +78,12 @@ def get_references(db, user_prompt):
     ref_materials: list[ReferenceMaterial] = []
     for ref in result['ref']:
         skills_str = ', '.join(ref['skills'])
+        search_link = yandex_search_first_link(ref['title'])
+        print(search_link)
         material = ReferenceMaterial(
             title=ref['title'],
             skills=skills_str,
-            link=ref['link']
+            link=search_link
         )
         ref_materials.append(material)
     return ref_materials
@@ -148,3 +153,39 @@ def get_task(db, user_prompt):
         )
         task_materials.append(material)
     return task_materials
+
+
+def yandex_search_first_link(query: str) -> str | None:
+    time.sleep(1)
+    query = "книга " + query
+    url = "https://yandex.ru/search/xml"
+    params = {
+        "folderid": os.environ.get('YANDEX_FOLDER_ID'),
+        "apikey": os.environ.get('YANDEX_API_KEY'),
+        "l10n": "ru",
+        "sortby": "rlv",
+        "filter": "none",
+        "maxpassages": "1",
+        "groupby": "attr=d.mode=deep.groups-on-page=100.docs-in-group=1",
+        "query": query,
+        "page": 0,
+        "lr": 213,
+    }
+
+    headers = {}
+
+    response = requests.get(url, params=params, headers=headers)
+    
+    if response.status_code == 200:
+        root = etree.fromstring(response.content)
+        first_url = root.find('.//doc/url')
+        if first_url is not None:
+            first_url_str = first_url.text
+            return first_url_str
+        else:
+            print("Нет результатов.")
+            return None
+    else:
+        print("Ошибка запроса:", response.status_code)
+        print(response.text)
+        return None
